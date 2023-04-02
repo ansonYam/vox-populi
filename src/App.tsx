@@ -20,7 +20,7 @@ function App() {
   const [hasBorder, setHasBorder] = useState(false)
 
   const [orgId, setOrgId] = useState<String | undefined>(undefined)
-  
+
   const [transcription, setTranscription] = useState<string[]>([]);
   const [translation, setTranslation] = useState<string[]>([]);
 
@@ -65,27 +65,35 @@ function App() {
   let eventSource: EventSource | null = null;
 
   const startTranscription = async () => {
-    // TODO: move the localhost url to an env file, change for production
-    try {
-      // Get the current URL, hardcoded for now
-      const stream_url = 'https://www.youtube.com/watch?v=l2jp8NczeQQ';
-      eventSource = new EventSource(`http://localhost:5000/start?stream_url=${stream_url}`);
-      eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        // console.log(data);
-        setTranscription(prevTranscription => {
-          // Keep only the last 10 lines of transcription
-          const newTranscription = [...prevTranscription, data.transcription].slice(-10);
-          return newTranscription;      
-        });
+    // clear any previous text
+    setTranscription([]);
+    setTranslation([]);
 
-        setTranslation(prevTranslation => {
-          const newTranslation = [...prevTranslation, data.translation].slice(-10)
-          return newTranslation;
-        });
+    if (!eventSource) {
+      // TODO: move the localhost url to an env file, change for production
+      try {
+        // Get the current URL, hardcoded for now
+        const stream_url = 'https://www.youtube.com/watch?v=9lMDuugG49c';
+
+        // why is this constantly running?? from where is it being called?
+        eventSource = new EventSource(`http://localhost:5000/start?stream_url=${stream_url}`);
+        eventSource.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          // console.log(data);
+          setTranscription(prevTranscription => {
+            // Keep only the last 3 lines of transcription
+            const newTranscription = [...prevTranscription, data.transcription].slice(-3);
+            return newTranscription;
+          });
+
+          setTranslation(prevTranslation => {
+            const newTranslation = [...prevTranslation, data.translation].slice(-3)
+            return newTranslation;
+          });
+        }
+      } catch (error) {
+        console.error(error);
       }
-    } catch (error) {
-      console.error(error);
     }
   };
 
