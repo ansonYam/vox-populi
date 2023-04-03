@@ -16,18 +16,19 @@ const orgUser = fromSpecObservable(userClient.orgUser.observable)
 const org = fromSpecObservable(orgClient.observable)
 
 function App() {
-  const [isSmall, setIsSmall] = useState(true)
-  const [hasBorder, setHasBorder] = useState(false)
-
   const [orgId, setOrgId] = useState<String | undefined>(undefined)
+
+  const [eventSource, setEventSource] = useState<EventSource | null>(null);
 
   const [transcription, setTranscription] = useState<string[]>([]);
   const [translation, setTranslation] = useState<string[]>([]);
+  const [selectedLanguage, setSelectedLanguage] = useState("fr");
 
   useEffect(() => {
     const subscription = orgClient.observable.subscribe({
       next: (org) => {
-        console.log(org); // undefined, something wrong here - need to use WSL instead of Windows
+        // console.log(org); 
+        // undefined, something wrong here - need to use WSL instead of Windows
         setOrgId(org?.id);
       },
       error: (error) => {
@@ -38,45 +39,23 @@ function App() {
     return () => subscription.unsubscribe()
   })
 
-  const setSize = () => {
-    if (isSmall) {
-      embed.setSize('800px', '800px')
-      setIsSmall(false)
-    } else {
-      embed.setSize('600px', '600px')
-      setIsSmall(true)
-    }
+  const handleLanguageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newLanguage = event.target.value;
+    setSelectedLanguage(newLanguage);
   }
-
-  const setBorder = () => {
-    if (hasBorder) {
-      embed.setStyles({
-        border: 'none'
-      })
-      setHasBorder(false)
-    } else {
-      embed.setStyles({
-        border: '5px solid red'
-      })
-      setHasBorder(true)
-    }
-  }
-
-  let eventSource: EventSource | null = null;
 
   const startTranscription = async () => {
     // clear any previous text
     setTranscription([]);
     setTranslation([]);
 
-    if (!eventSource) {
-      // TODO: move the localhost url to an env file, change for production
-      try {
-        // Get the current URL, hardcoded for now
-        const stream_url = 'https://www.youtube.com/watch?v=9lMDuugG49c';
+    // TODO: move the localhost url to an env file, change for production
+    try {
+      // Get the current URL, hardcoded for now
+      const stream_url = 'https://www.youtube.com/watch?v=ahLiJuj6_tM';
 
-        // why is this constantly running?? from where is it being called?
-        eventSource = new EventSource(`http://localhost:5000/start?stream_url=${stream_url}`);
+      setEventSource(new EventSource(`http://localhost:5000/start?stream_url=${stream_url}&to_code=${selectedLanguage}`));
+      if (eventSource) {
         eventSource.onmessage = (event) => {
           const data = JSON.parse(event.data);
           // console.log(data);
@@ -91,38 +70,49 @@ function App() {
             return newTranslation;
           });
         }
-      } catch (error) {
-        console.error(error);
       }
+    } catch (error) {
+      console.error(error);
     }
   };
 
-  const stopTranscription = async () => {
+  const stopTranscription = () => {
+    fetch('http://localhost:5000/stop');
     if (eventSource) {
       eventSource.close();
-      eventSource = null;
+      setEventSource(null);
     }
-    fetch('http://localhost:5000/stop');
   }
+
+  useEffect(() => {
+    console.log("New eventSource: ", eventSource);
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    }
+  }, [eventSource]);
+
+  useEffect(() => {
+    console.log("New language: ", selectedLanguage);
+    stopTranscription();
+    startTranscription();
+  }, [selectedLanguage]);
 
   return (
     <div className="App">
+      <label htmlFor="language-select">Select a language: </label>
+      <select id="language-select" value={selectedLanguage} onChange={handleLanguageChange}>
+        <option value="zh">Chinese</option>
+        <option value="hi">Hindi</option>
+        <option value="es">Spanish</option>
+        <option value="fr">French</option>
+      </select>
+      <br />
       <button onClick={startTranscription}>Start transcription</button>
       <button onClick={stopTranscription}>Stop transcription</button>
       <p>{transcription}</p>
       <p>{translation}</p>
-
-      <div>Org: {org.name.get()}</div>
-      <div>Org ID: {orgId}</div>
-      <ul>
-        {orgUser.roleConnection.nodes.get()?.map((role) => (
-          <li key={role.id}>{role.slug}</li>
-        ))}
-      </ul>
-      <img src={getSrcByImageObj(user.avatarImage.get(), { size: "small" })} />
-      <h2>Embed controls</h2>
-      <button onClick={setSize}>Toggle Size</button>
-      <button onClick={setBorder}>Toggle Border</button>
     </div>
   )
 }
