@@ -39,7 +39,7 @@ function App() {
     return () => subscription.unsubscribe()
   })
 
-  const sleep = (ms: any) => new Promise(r => setTimeout(r, ms));
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
   const handleLanguageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newLanguage = event.target.value;
@@ -59,12 +59,13 @@ function App() {
       // start the audio and transcription threads in the backend
       let response = await fetch(`http://localhost:5000/start?stream_url=${stream_url}&to_code=${selectedLanguage}`);
       console.log("Fetch response: ", response);
-      if (response.ok) {
-        eventSource?.close(); // just in case
-        setEventSource(new EventSource(`http://localhost:5000/stream`));  
-      } else {
+      if (!response.ok) {
         throw new Error('Failed to start the audio thread');
-      }
+      } 
+
+      eventSource?.close(); // just in case
+      setEventSource(new EventSource(`http://localhost:5000/stream`));  
+
     } catch (error) {
       console.error(error);
     }
@@ -84,8 +85,10 @@ function App() {
   useEffect(() => {
     if (eventSource) {
       console.log("New eventSource: ", eventSource);
-      eventSource.onmessage = (event) => {
+      eventSource.onmessage = async (event) => {
         let data = JSON.parse(event.data);
+        await sleep(10000); // sometimes the audio is desynced from the video
+
         // console.log(data);
         setTranscription(prevTranscription => {
           // Keep only the last 3 lines of transcription
